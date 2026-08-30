@@ -303,15 +303,22 @@
         return outputText;
     }
 
-    // Completely resolves full input strings (including multi-gene tokens) into raw base genes
+    m();    // Completely resolves full input strings into raw base genes
     function decomposeLineToRawGenes(line) {
         let rawGenes = [];
         let cleanLine = line.trim();
 
-        // Sort named combo keys by length descending to match longer combos first (e.g. "Suma Pastel" before "Suma")
-        let sortedComboNames = Object.keys(REVERSE_NAMED_COMBOS).sort((a, b) => b.length - a.length);
+        // 1. Convert explicit "Super [Gene]" phrases into two base gene instances
+        // e.g., "Super Cinnamon" -> "Cinnamon Cinnamon", "Super Pastel" -> "Pastel Pastel"
+        DATABASE.incDom.forEach(gene => {
+            let superRegex = new RegExp(`\\bSuper\\s+${gene}\\b`, 'gi');
+            if (superRegex.test(cleanLine)) {
+                cleanLine = cleanLine.replace(superRegex, `${gene} ${gene}`);
+            }
+        });
 
-        // Replace known named combos/supers with space-separated base ingredients
+        // 2. Replace known named combos/supers (e.g. "Suma" -> "Mahogany Mahogany", "Ivory" -> "Yellowbelly Yellowbelly")
+        let sortedComboNames = Object.keys(REVERSE_NAMED_COMBOS).sort((a, b) => b.length - a.length);
         sortedComboNames.forEach(combo => {
             let regex = new RegExp(`\\b${combo}\\b`, 'gi');
             if (regex.test(cleanLine)) {
@@ -320,7 +327,10 @@
             }
         });
 
-        // Split remaining string into individual words and normalize
+        // 3. Strip out any stray "Super" words left over so they don't attach to dominant/recessive genes
+        cleanLine = cleanLine.replace(/\bSuper\b/gi, '');
+
+        // 4. Split remaining string into individual normalized gene words
         let words = cleanLine.split(/\s+/);
         words.forEach(word => {
             if (!word.trim()) return;
@@ -387,6 +397,8 @@
         });
 
         return output;
+    }
+
     }
 
     function runGeneticsEngine() {
