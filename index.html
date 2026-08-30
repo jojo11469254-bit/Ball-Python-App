@@ -406,26 +406,70 @@
         return outputText;
     }
 
+    function reverseEngineerTarget(targetText) {
+        if (!targetText.trim()) return "Please enter a target combo in Box 3.";
+        
+        let lines = targetText.split('\n');
+        let output = `=== REVERSE ENGINEERING TARGET GOAL ===\n`;
+        
+        lines.forEach(line => {
+            if (!line.trim()) return;
+            let target = line.trim();
+            let lowerTarget = target.toLowerCase();
+            let genesNeeded = [];
+
+            if (REVERSE_NAMED_COMBOS[lowerTarget]) {
+                genesNeeded = REVERSE_NAMED_COMBOS[lowerTarget].map(g => capitalize(g));
+            } else {
+                let words = target.split(/\s+/);
+                words.forEach(w => genesNeeded.push(capitalize(normalizeGeneName(w))));
+            }
+
+            output += `\n🎯 Target: "${target}"\n`;
+            output += `   Required Genetic Ingredients:\n`;
+            
+            genesNeeded.forEach(gene => {
+                if (isRecessive(gene)) {
+                    output += `   • ${gene}: Requires Visual ${gene} from parents OR 100% Het ${gene} from BOTH parents.\n`;
+                } else {
+                    output += `   • ${gene}: Requires at least 1 copy from either parent (Sire or Dam).\n`;
+                }
+            });
+
+            output += `   💡 Minimum Breeding Pair Recommendation:\n`;
+            output += `      - Parent 1 (Sire): ${genesNeeded.slice(0, Math.ceil(genesNeeded.length/2)).join(' ')}\n`;
+            output += `      - Parent 2 (Dam) : ${genesNeeded.slice(Math.ceil(genesNeeded.length/2)).join(' ')}\n`;
+        });
+
+        return output;
+    }
+
     function runGeneticsEngine() {
         const p1Text = document.getElementById('p1Input').value;
         const p2Text = document.getElementById('p2Input').value;
+        const targetText = document.getElementById('targetInput').value;
         const outputBox = document.getElementById('outputBox');
-        if (p1Text.trim() || p2Text.trim()) {
+
+        if (targetText.trim() && !p1Text.trim() && !p2Text.trim()) {
+            outputBox.value = reverseEngineerTarget(targetText);
+        } else if (p1Text.trim() || p2Text.trim()) {
             outputBox.value = calculateOffspring(parseInputText(p1Text), parseInputText(p2Text));
         } else {
-            outputBox.value = "Please fill in Box 1 and Box 2 to calculate offspring.";
+            outputBox.value = "Please fill in Box 1 & 2 for offspring odds, OR fill Box 3 to reverse engineer a combo.";
         }
     }
 
     function loadExampleData() {
-        document.getElementById('p1Input').value = "Pinstripe: het\nCinnamon: het\nPiebald: het";
-        document.getElementById('p2Input').value = "Piebald: het";
+        document.getElementById('p1Input').value = '';
+        document.getElementById('p2Input').value = '';
+        document.getElementById('targetInput').value = "Pinstripe Cinnamon Piebald\nSuma Pied\nIvory Clown";
         runGeneticsEngine();
     }
 
     function loadRandomDemo() {
         document.getElementById('p1Input').value = "Pastel: het\nYellowbelly: het";
         document.getElementById('p2Input').value = "Pastel: het\nPiebald: het";
+        document.getElementById('targetInput').value = "";
         runGeneticsEngine();
     }
 
@@ -440,3 +484,4 @@
 </script>
 </body>
 </html>
+      
