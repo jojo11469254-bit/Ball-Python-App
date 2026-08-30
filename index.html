@@ -412,32 +412,32 @@
         return outputText;
     }
 
-    // Inspects line for impossible genetic constructs (e.g. "Super Pinstripe")
     function checkForGeneticErrors(line) {
         let errors = [];
-        let superRegex = /\bSuper\s+([A-Za-z\s]+)/gi;
+        let cleanLine = line.trim();
+
+        let superRegex = /\bSuper\s+([A-Za-z\(\)\/\-]+)/gi;
         let match;
 
-        while ((match = superRegex.exec(line)) !== null) {
-            let trait = match[1].trim();
-            // Stop at word boundaries if multiple words follow
-            let words = trait.split(/\s+/);
-            let firstTraitWord = capitalize(normalizeGeneName(words[0]));
-
-            if (isDominant(firstTraitWord)) {
+        while ((match = superRegex.exec(cleanLine)) !== null) {
+            let candidateTrait = match[1].trim();
+            let normalized = normalizeGeneName(candidateTrait);
+            
+            if (isDominant(normalized)) {
                 errors.push({
-                    gene: firstTraitWord,
+                    gene: capitalize(normalized),
                     type: 'Dominant',
-                    reason: `"${firstTraitWord}" is a Dominant gene. Dominant morphs produce identical phenotypes whether they carry 1 copy (heterozygous) or 2 copies (homozygous). Because two copies look identical to one copy, there is no distinct "Super" form.`
+                    reason: `"${capitalize(normalized)}" is a Dominant gene. Heterozygous (1 copy) and Homozygous (2 copies) phenotypes are visually identical. Because 2 copies do not produce a distinct phenotype, a "Super" form does not exist.`
                 });
-            } else if (isRecessive(firstTraitWord)) {
+            } else if (isRecessive(normalized)) {
                 errors.push({
-                    gene: firstTraitWord,
+                    gene: capitalize(normalized),
                     type: 'Recessive',
-                    reason: `"${firstTraitWord}" is a Recessive gene. Carrying 2 copies results in a "Visual ${firstTraitWord}", not a "Super" form.`
+                    reason: `"${capitalize(normalized)}" is a Recessive gene. Carrying 2 copies results in a "Visual ${capitalize(normalized)}", not a "Super" form.`
                 });
             }
         }
+
         return errors;
     }
 
@@ -489,7 +489,6 @@
             if (!line.trim()) return;
             let target = line.trim();
 
-            // Run corrective genetic validation before reverse engineering
             let validationErrors = checkForGeneticErrors(target);
             if (validationErrors.length > 0) {
                 output += `\n❌ INVALID GOAL ENTERED: "${target}"\n`;
@@ -497,7 +496,7 @@
                     output += `   ⚠️ Warning: "Super ${err.gene}" does not exist!\n`;
                     output += `   🧬 Inheritance Explanation: ${err.reason}\n`;
                 });
-                output += `   👉 Suggestion: Search for standard "${target.replace(/\bSuper\s+/gi, '')}" instead.\n`;
+                output += `   👉 Correction Suggestion: Look for standard "${target.replace(/\bSuper\s+/gi, '')}" instead.\n`;
                 return;
             }
             
@@ -582,6 +581,7 @@
 </script>
 </body>
 </html>
+
 
 
 
