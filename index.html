@@ -65,7 +65,7 @@
 
         <div class="box-container">
             <label class="label-target" for="targetInput">3. Target Combo / Goal (Reverse Engineer)</label>
-            <textarea id="targetInput" placeholder="Super Cinnamon Pinstripe&#10;Suma Cinnamon Pied&#10;Ivory Clown"></textarea>
+            <textarea id="targetInput" placeholder="Super Cinnamon Pinstripe&#10;Super Pinstripe&#10;Suma Cinnamon Pied"></textarea>
         </div>
     </div>
 
@@ -262,6 +262,11 @@
         return DATABASE.recessive.some(r => r.toLowerCase() === normalized.toLowerCase());
     }
 
+    function isDominant(gene) {
+        let normalized = normalizeGeneName(gene);
+        return DATABASE.dominant.some(d => d.toLowerCase() === normalized.toLowerCase());
+    }
+
     function capitalize(str) { return str.replace(/\b\w/g, l => l.toUpperCase()); }
 
     function parseInputText(text) {
@@ -407,6 +412,35 @@
         return outputText;
     }
 
+    // Inspects line for impossible genetic constructs (e.g. "Super Pinstripe")
+    function checkForGeneticErrors(line) {
+        let errors = [];
+        let superRegex = /\bSuper\s+([A-Za-z\s]+)/gi;
+        let match;
+
+        while ((match = superRegex.exec(line)) !== null) {
+            let trait = match[1].trim();
+            // Stop at word boundaries if multiple words follow
+            let words = trait.split(/\s+/);
+            let firstTraitWord = capitalize(normalizeGeneName(words[0]));
+
+            if (isDominant(firstTraitWord)) {
+                errors.push({
+                    gene: firstTraitWord,
+                    type: 'Dominant',
+                    reason: `"${firstTraitWord}" is a Dominant gene. Dominant morphs produce identical phenotypes whether they carry 1 copy (heterozygous) or 2 copies (homozygous). Because two copies look identical to one copy, there is no distinct "Super" form.`
+                });
+            } else if (isRecessive(firstTraitWord)) {
+                errors.push({
+                    gene: firstTraitWord,
+                    type: 'Recessive',
+                    reason: `"${firstTraitWord}" is a Recessive gene. Carrying 2 copies results in a "Visual ${firstTraitWord}", not a "Super" form.`
+                });
+            }
+        }
+        return errors;
+    }
+
     function decomposeLineToRawGenes(line) {
         let rawGenes = [];
         let cleanLine = line.trim();
@@ -454,6 +488,18 @@
         lines.forEach(line => {
             if (!line.trim()) return;
             let target = line.trim();
+
+            // Run corrective genetic validation before reverse engineering
+            let validationErrors = checkForGeneticErrors(target);
+            if (validationErrors.length > 0) {
+                output += `\n❌ INVALID GOAL ENTERED: "${target}"\n`;
+                validationErrors.forEach(err => {
+                    output += `   ⚠️ Warning: "Super ${err.gene}" does not exist!\n`;
+                    output += `   🧬 Inheritance Explanation: ${err.reason}\n`;
+                });
+                output += `   👉 Suggestion: Search for standard "${target.replace(/\bSuper\s+/gi, '')}" instead.\n`;
+                return;
+            }
             
             let rawGenes = decomposeLineToRawGenes(target);
             
@@ -514,7 +560,7 @@
     function loadExampleData() {
         document.getElementById('p1Input').value = '';
         document.getElementById('p2Input').value = '';
-        document.getElementById('targetInput').value = "Super Cinnamon Pinstripe\nSuma Cinnamon Pied\nIvory Clown";
+        document.getElementById('targetInput').value = "Super Pinstripe\nSuper Cinnamon Pinstripe\nSuma Cinnamon Pied";
         runGeneticsEngine();
     }
 
@@ -536,6 +582,7 @@
 </script>
 </body>
 </html>
+
 
 
 
