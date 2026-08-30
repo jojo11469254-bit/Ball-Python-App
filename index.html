@@ -406,6 +406,48 @@
         return outputText;
     }
 
+    // Fully deconstructs any combo/super into individual base alleles
+    function decomposeToRawGenes(targetString) {
+        let words = targetString.trim().split(/\s+/);
+        let rawList = [];
+
+        words.forEach(word => {
+            let lowerWord = word.toLowerCase();
+            let normalized = normalizeGeneName(word);
+            let lowerNormalized = normalized.toLowerCase();
+
+            // Check if word is a named super/combo (e.g. Suma, Ivory, BEL)
+            if (REVERSE_NAMED_COMBOS[lowerWord]) {
+                REVERSE_NAMED_COMBOS[lowerWord].forEach(sub => rawList.push(capitalize(sub)));
+            } else if (REVERSE_NAMED_COMBOS[lowerNormalized]) {
+                REVERSE_NAMED_COMBOS[lowerNormalized].forEach(sub => rawList.push(capitalize(sub)));
+            } else {
+                rawList.push(capitalize(normalized));
+            }
+        });
+
+        // Second pass: check if any 2-word combinations in rawList form a super/combo
+        let finalGenes = [];
+        let i = 0;
+        while (i < rawList.length) {
+            if (i < rawList.length - 1) {
+                let pairKey = [rawList[i], rawList[i+1]].map(s => s.toLowerCase()).sort().join('+');
+                if (DATABASE.namedCombos[pairKey]) {
+                    let comboName = DATABASE.namedCombos[pairKey].toLowerCase();
+                    if (REVERSE_NAMED_COMBOS[comboName]) {
+                        REVERSE_NAMED_COMBOS[comboName].forEach(sub => finalGenes.push(capitalize(sub)));
+                        i += 2;
+                        continue;
+                    }
+                }
+            }
+            finalGenes.push(rawList[i]);
+            i++;
+        }
+
+        return finalGenes;
+    }
+
     function reverseEngineerTarget(targetText) {
         if (!targetText.trim()) return "Please enter a target combo in Box 3.";
         
@@ -415,43 +457,47 @@
         lines.forEach(line => {
             if (!line.trim()) return;
             let target = line.trim();
-            let lowerTarget = target.toLowerCase();
-            let genesNeeded = [];
-
-            if (REVERSE_NAMED_COMBOS[lowerTarget]) {
-                genesNeeded = REVERSE_NAMED_COMBOS[lowerTarget].map(g => capitalize(g));
-            } else {
-                let words = target.split(/\s+/);
-                words.forEach(w => {
-                    let cleanWord = w.toLowerCase();
-                    if (REVERSE_NAMED_COMBOS[cleanWord]) {
-                        REVERSE_NAMED_COMBOS[cleanWord].forEach(subGene => genesNeeded.push(capitalize(subGene)));
-                    } else {
-                        genesNeeded.push(capitalize(normalizeGeneName(w)));
-                    }
-                });
-            }
-
-            genesNeeded = [...new Set(genesNeeded)];
-
-            output += `\n🎯 Target: "${target}"\n`;
-            output += `   Required Genetic Ingredients:\n`;
             
-            genesNeeded.forEach(gene => {
-                if (isRecessive(gene)) {
-                    output += `   • ${gene}: Requires Visual ${gene} from parents OR 100% Het ${gene} from BOTH parents.\n`;
-                } else {
-                    output += `   • ${gene}: Requires at least 1 copy from either parent (Sire or Dam).\n`;
-                }
+            // Extract raw base alleles
+            let rawGenes = decomposeToRawGenes(target);
+            
+            // Count frequencies of each base gene (e.g., Mahogany x2 for Suma)
+            let geneCounts = {};
+            rawGenes.forEach(g => {
+                geneCounts[g] = (geneCounts[g] || 0) + 1;
             });
 
-            let half = Math.ceil(genesNeeded.length / 2);
-            let parent1Genes = genesNeeded.slice(0, half);
-            let parent2Genes = genesNeeded.slice(half);
+            output += `\n🎯 Target Goal: "${target}"\n`;
+            output += `   Deconstructed Genetic Ingredients:\n`;
 
-            output += `   💡 Recommended Base Breeding Pair:\n`;
-            output += `      - Parent 1 (Sire): ${parent1Genes.length ? parent1Genes.join(' ') : 'Normal / Any'}\n`;
-            output += `      - Parent 2 (Dam) : ${parent2Genes.length ? parent2Genes.join(' ') : 'Normal / Any'}\n`;
+            let sireGenes = [];
+            let damGenes = [];
+
+            for (let gene in geneCounts) {
+                let count = geneCounts[gene];
+                if (isRecessive(gene)) {
+                    output += `   • ${gene} (Recessive): Requires 2 copies for Visual expression.\n`;
+                    // Assign Het status to BOTH parents so visual offspring are possible
+                    sireGenes.push(`Het ${gene}`);
+                    damGenes.push(`Het ${gene}`);
+                } else if (count >= 2) {
+                    output += `   • ${gene} (Super Form / Homozygous): Requires 1 copy from Sire AND 1 copy from Dam.\n`;
+                    sireGenes.push(gene);
+                    damGenes.push(gene);
+                } else {
+                    output += `   • ${gene} (Single Gene): Requires 1 copy from either parent.\n`;
+                    // Distribute single dominant/inc-dom genes to the parent with fewer genes
+                    if (sireGenes.length <= damGenes.length) {
+                        sireGenes.push(gene);
+                    } else {
+                        damGenes.push(gene);
+                    }
+                }
+            }
+
+            output += `\n   💡 Recommended Base Breeding Pair:\n`;
+            output += `      - Parent 1 (Sire): ${sireGenes.length ? sireGenes.join(' ') : 'Normal / Wildtype'}\n`;
+            output += `      - Parent 2 (Dam) : ${damGenes.length ? damGenes.join(' ') : 'Normal / Wildtype'}\n`;
         });
 
         return output;
@@ -475,7 +521,7 @@
     function loadExampleData() {
         document.getElementById('p1Input').value = '';
         document.getElementById('p2Input').value = '';
-        document.getElementById('targetInput').value = "Pinstripe Cinnamon Piebald\nSuma Pied\nIvory Clown";
+        document.getElementById('targetInput').value = "Suma Cinnamon Pied\nIvory Clown";
         runGeneticsEngine();
     }
 
@@ -497,5 +543,6 @@
 </script>
 </body>
 </html>
+
 
       
